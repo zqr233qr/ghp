@@ -69,17 +69,27 @@ func RunCommandWithRetry(ctx context.Context, aiCmd []string, fallbackArgs [][]s
 		useShell bool
 	}
 	var tries []tryCmd
+	seenCmds := make(map[string]bool)
+
+	addTry := func(args []string, useShell bool) {
+		cmdStr := strings.Join(args, " ")
+		key := fmt.Sprintf("%v:%s", useShell, cmdStr) // 区分 shell 模式和直接执行
+		if !seenCmds[key] {
+			tries = append(tries, tryCmd{args: args, useShell: useShell})
+			seenCmds[key] = true
+		}
+	}
 
 	if len(aiCmd) > 0 {
-		tries = append(tries, tryCmd{args: aiCmd, useShell: false})
+		addTry(aiCmd, false)
 	}
 	for _, args := range fallbackArgs {
-		tries = append(tries, tryCmd{args: append([]string{needHelp}, args...), useShell: false})
+		addTry(append([]string{needHelp}, args...), false)
 	}
 	if len(aiCmd) > 0 {
-		tries = append(tries, tryCmd{args: aiCmd, useShell: true})
+		addTry(aiCmd, true)
 	}
-	tries = append(tries, tryCmd{args: []string{needHelp, "--help"}, useShell: true})
+	addTry([]string{needHelp, "--help"}, true)
 
 	userShell := os.Getenv("SHELL")
 	if userShell == "" {

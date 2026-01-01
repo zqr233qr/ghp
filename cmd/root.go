@@ -16,10 +16,10 @@ import (
 )
 
 var (
-	useStream bool
-	useShort  bool
-	forceMode bool
-	analyzeMode bool
+	useStream    bool
+	useShort     bool
+	forceMode    bool
+	analyzeMode  bool
 	generateMode bool
 )
 
@@ -61,7 +61,7 @@ var rootCmd = &cobra.Command{
 		// 3. 检查命令是否存在
 		cmdPath, err := executor.CheckCommandExists(program)
 		isMissing := false
-		
+
 		if err != nil {
 			// 如果是分析模式或生成模式，必须要求命令存在
 			if analyzeMode || generateMode {
@@ -91,13 +91,22 @@ var rootCmd = &cobra.Command{
 			}
 
 			// 5. 执行帮助命令
-			var success bool
-			helpOutput, usedCmd, success = executor.RunCommandWithRetry(
+			hOut, hUsed, success := executor.RunCommandWithRetry(
 				ctx, helpCmdArgs, [][]string{{"--help"}, {"-h"}, {"help"}}, program,
 			)
 			if !success {
-				fmt.Println("无法获取命令帮助文档。已尝试 AI 推荐指令及标准参数。")
-				return
+				if forceMode {
+					fmt.Println("警告: 无法获取命令帮助文档，将转为强制模式进行查询。")
+					isMissing = true
+					cmdPath = "检测到命令但无法运行"
+				} else {
+					fmt.Println("无法获取命令帮助文档。已尝试 AI 推荐指令及标准参数。")
+					fmt.Println("提示: 命令可能无法正常运行（如 Windows 应用商店别名），请尝试使用 -f 或 --force 参数强制查询。")
+					return
+				}
+			} else {
+				helpOutput = hOut
+				usedCmd = hUsed
 			}
 
 			// 6. 执行版本命令 (仅精简模式需尝试，且不在分析/生成模式下)
@@ -168,7 +177,7 @@ func init() {
 	rootCmd.Flags().BoolVarP(&forceMode, "force", "f", false, "强制查询模式 (即使命令不存在也查询)")
 	rootCmd.Flags().BoolVarP(&analyzeMode, "analyze", "a", false, "解析模式 (解释具体命令及参数含义)")
 	rootCmd.Flags().BoolVarP(&generateMode, "generate", "g", false, "生成模式 (根据自然语言描述生成命令)")
-	
+
 	// 关键修复：禁用 Flag 穿插解析
 	rootCmd.Flags().SetInterspersed(false)
 }
