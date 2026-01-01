@@ -29,6 +29,16 @@ var rootCmd = &cobra.Command{
 	Long:  `ghp is a CLI tool that uses AI to explain commands and provide usage examples.`,
 	Args:  cobra.MinimumNArgs(1),
 	Run: func(cmd *cobra.Command, args []string) {
+		// 0. 参数互斥检查
+		if analyzeMode && generateMode {
+			fmt.Println("错误: 无法同时使用解析模式 (-a) 和生成模式 (-g)。请只选择一种操作。")
+			return
+		}
+		if forceMode && (analyzeMode || generateMode) {
+			fmt.Println("错误: 强制模式 (-f) 仅适用于普通查询，不能与解析 (-a) 或生成 (-g) 模式混用。")
+			return
+		}
+
 		program := args[0]
 		var subQuery string
 		if len(args) > 1 {
@@ -105,7 +115,7 @@ var rootCmd = &cobra.Command{
 
 		// 分支：命令分析模式
 		if analyzeMode {
-			fullCommand := strings.Join(args, " ")
+			fullCommand := reconstructArgs(args)
 			if err := aiClient.ExplainCommand(ctx, useStream, fullCommand, helpOutput, cmdPath); err != nil {
 				fmt.Println("AI 解析失败:", err)
 			}
@@ -114,7 +124,7 @@ var rootCmd = &cobra.Command{
 
 		// 分支：命令生成模式
 		if generateMode {
-			description := subQuery // args[1:]
+			description := strings.Join(args[1:], " ")
 			if description == "" {
 				fmt.Println("错误: 生成模式需要提供自然语言描述 (例如: ghp -g git 设置全局用户名)")
 				return
@@ -137,6 +147,19 @@ func Execute() {
 		fmt.Println(err)
 		os.Exit(1)
 	}
+}
+
+// reconstructArgs 重组参数，为包含空格的参数添加引号
+func reconstructArgs(args []string) string {
+	var parts []string
+	for _, arg := range args {
+		if strings.Contains(arg, " ") || strings.Contains(arg, "\t") {
+			parts = append(parts, fmt.Sprintf("%q", arg))
+		} else {
+			parts = append(parts, arg)
+		}
+	}
+	return strings.Join(parts, " ")
 }
 
 func init() {
