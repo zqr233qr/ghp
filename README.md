@@ -73,7 +73,7 @@ ghp -f rust
 ### 6. 完整模式
 如果你需要查看 AI 翻译的完整帮助文档（非精简版）：
 ```bash
-ghp --short=false git
+ghp --concise=false git
 ```
 
 ## 📝 License
