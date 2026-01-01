@@ -20,6 +20,7 @@ var (
 	useShort  bool
 	forceMode bool
 	analyzeMode bool
+	generateMode bool
 )
 
 var rootCmd = &cobra.Command{
@@ -52,10 +53,10 @@ var rootCmd = &cobra.Command{
 		isMissing := false
 		
 		if err != nil {
-			// 如果是分析模式，必须要求命令存在
-			if analyzeMode {
+			// 如果是分析模式或生成模式，必须要求命令存在
+			if analyzeMode || generateMode {
 				fmt.Println(err)
-				fmt.Println("错误: 无法分析未安装的命令。我们需要本地帮助文档来确保解释的准确性。")
+				fmt.Println("错误: 无法处理未安装的命令。我们需要本地帮助文档来确保解释/生成的准确性。")
 				return
 			}
 			if !forceMode {
@@ -89,8 +90,8 @@ var rootCmd = &cobra.Command{
 				return
 			}
 
-			// 6. 执行版本命令 (仅精简模式需尝试，且不在分析模式下)
-			if useShort && !analyzeMode {
+			// 6. 执行版本命令 (仅精简模式需尝试，且不在分析/生成模式下)
+			if useShort && !analyzeMode && !generateMode {
 				out, _, success := executor.RunCommandWithRetry(
 					ctx, verCmdArgs, [][]string{{"--version"}, {"-v"}, {"version"}}, program,
 				)
@@ -107,6 +108,19 @@ var rootCmd = &cobra.Command{
 			fullCommand := strings.Join(args, " ")
 			if err := aiClient.ExplainCommand(ctx, useStream, fullCommand, helpOutput, cmdPath); err != nil {
 				fmt.Println("AI 解析失败:", err)
+			}
+			return
+		}
+
+		// 分支：命令生成模式
+		if generateMode {
+			description := subQuery // args[1:]
+			if description == "" {
+				fmt.Println("错误: 生成模式需要提供自然语言描述 (例如: ghp -g git 设置全局用户名)")
+				return
+			}
+			if err := aiClient.GenerateCommand(ctx, useStream, program, description, helpOutput, cmdPath); err != nil {
+				fmt.Println("AI 生成失败:", err)
 			}
 			return
 		}
@@ -130,6 +144,7 @@ func init() {
 	rootCmd.Flags().BoolVarP(&useShort, "short", "c", true, "是否精简输出")
 	rootCmd.Flags().BoolVarP(&forceMode, "force", "f", false, "强制查询模式 (即使命令不存在也查询)")
 	rootCmd.Flags().BoolVarP(&analyzeMode, "analyze", "a", false, "解析模式 (解释具体命令及参数含义)")
+	rootCmd.Flags().BoolVarP(&generateMode, "generate", "g", false, "生成模式 (根据自然语言描述生成命令)")
 	
 	// 关键修复：禁用 Flag 穿插解析
 	rootCmd.Flags().SetInterspersed(false)

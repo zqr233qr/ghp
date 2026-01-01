@@ -186,6 +186,75 @@ func (c *Client) ExplainCommand(ctx context.Context, useStream bool, fullCommand
 	return nil
 }
 
+// GenerateCommand 根据自然语言描述生成命令
+func (c *Client) GenerateCommand(ctx context.Context, useStream bool, program, description, helpOutput, cmdPath string) error {
+	osname := runtime.GOOS
+	systemPrompt := "你是一个命令行专家。用户指定了一个主命令和一段自然语言描述，请根据帮助文档，将用户的自然语言需求转换为最准确的执行命令。\n\n" +
+		"【必须遵守的规则】\n" +
+		"1. **生成命令**：直接给出一条可执行的、最符合用户需求的完整命令。\n" +
+		"2. **命令解析**：简要解释命令中用到的关键参数。\n" +
+		"3. **使用简短命令**：除非必要，否则**不要**在生成的命令中使用绝对路径（例如，使用 `git` 而不是 `/usr/bin/git`）。\n" +
+		"4. **相关建议**：执行该命令后的注意事项或下一步操作建议。\n" +
+		"5. **严禁 Markdown**：绝对不要使用 markdown 格式。输出必须是纯文本。\n" +
+		"6. **准确性**：必须参考提供的帮助文档。\n" +
+		"7. **格式范例**：\n" +
+		"   需求: git 设置全局用户名\n" +
+		"   位置: /usr/bin/git\n\n" +
+		"   推荐命令:\n" +
+		"     git config --global user.name \"Your Name\"\n\n" +
+		"   解析:\n" +
+		"     config    修改配置文件\n" +
+		"     --global  写入全局配置 (~/.gitconfig)\n" +
+		"     user.name 设置用户名字段\n\n" +
+		"   建议:\n" +
+		"     - 你可能还需要设置邮箱: git config --global user.email \"you@example.com\"\n" +
+		"     - 查看当前配置: git config --list"
+
+	userContent := fmt.Sprintf("我的系统环境是%s\n命令安装位置: %s\n主命令: %s\n**用户需求**: %s\n\n参考帮助文档:\n%s", osname, cmdPath, program, description, helpOutput)
+
+	req := openai.ChatCompletionRequest{
+		Model: c.model,
+		Messages: []openai.ChatCompletionMessage{
+			{Role: openai.ChatMessageRoleSystem, Content: systemPrompt},
+			{Role: openai.ChatMessageRoleUser, Content: userContent},
+		},
+		Temperature: 1,
+	}
+
+	if useStream {
+		stream, err := c.client.CreateChatCompletionStream(ctx, req)
+		if err != nil {
+			return err
+		}
+		defer stream.Close()
+
+		for {
+			select {
+			case <-ctx.Done():
+				return nil
+			default:
+			}
+			resp, err := stream.Recv()
+			if errors.Is(err, io.EOF) {
+				break
+			}
+			if err != nil {
+				return err
+			}
+			fmt.Print(resp.Choices[0].Delta.Content)
+		}
+		fmt.Println()
+		return nil
+	}
+
+	resp, err := c.client.CreateChatCompletion(ctx, req)
+	if err != nil {
+		return err
+	}
+	fmt.Println(resp.Choices[0].Message.Content)
+	return nil
+}
+
 func (c *Client) buildSystemPrompt(useShort, isMissing bool, subQuery string) string {
 	if isMissing {
 		return "你是一个精通服务器的专家。用户询问的命令**在本地尚未安装**。\n" +
