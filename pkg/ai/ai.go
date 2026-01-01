@@ -330,16 +330,32 @@ func (c *Client) buildSystemPrompt(useConcise, isMissing bool, subQuery string) 
 			"  ls *.go     # 列出所有 go 文件"
 	}
 
-	// 场景 4: 完整模式
+	// 场景 4: 完整模式 (非精简)
 	return "你是一个精通服务器及各种编程语言的专家。用户会提供一段程序命令的帮助文档。\n" +
 		"你的任务是生成一份高质量的**中文帮助手册**。\n\n" +
 		"【必须遵守的规则】\n" +
-		"1. **全程中文**：所有解释、说明必须翻译成中文。保留命令参数（如 -h, --help）和专有名词（如 TCP, JSON）的原样。\n" +
-		"2. **严禁 Markdown**：绝对不要使用 markdown 格式（不要用 ```代码块```，不要用 **加粗**，不要用 # 标题）。输出必须是纯文本，模仿终端的原始输出风格。\n" +
-		"3. **格式保持**：尽量保持原文档的缩进和布局，方便用户左右对照。\n" +
-		"4. **常用示例**：在文档末尾，必须补充 3-5 个最常用的实战命令示例，并附带简短中文说明。\n" +
-		"5. **信息补充**：请在文档开头明确列出程序的安装位置（用户会提供）。\n" +
-		"6. **无废话**：直接输出结果，不要包含“好的”、“这是翻译”等对话性文字。"
+		"1. **格式统一**：请严格遵守下方的【输出格式范例】，保持版面整洁。\n" +
+		"2. **介绍**：一句话简要说明该命令的核心功能。\n" +
+		"3. **位置**：必须输出一行 `位置: [程序路径]`（路径由用户提供）。\n" +
+		"4. **版本**：从提供的版本信息中提取版本号。如果提供了版本信息，在位置下方单列一行 `版本: x.y.z`。如果未提供，则不显示。\n" +
+		"5. **帮助原文**：翻译并整理原始帮助文档中的所有选项和用法说明。保留参数名原样，解释翻译为中文。\n" +
+		"6. **常用示例**：提供 3-5 个最常用的实战命令示例，并附带简短中文说明。\n" +
+		"7. **清洗噪音**：如果原始文档包含“非法选项”、“错误”等无关信息，请忽略它们。\n" +
+		"8. **严禁 Markdown**：绝对不要使用 markdown 格式。输出必须是纯文本。\n\n" +
+		"【输出格式范例】\n" +
+		"介绍: 分布式版本控制工具\n" +
+		"位置: /usr/bin/git\n" +
+		"版本: 2.39.0\n\n" +
+		"帮助原文:\n" +
+		"  用法: git [--version] [--help] <command> [<args>]\n" +
+		"  选项:\n" +
+		"    --version   显示版本信息\n" +
+		"    -h, --help  显示帮助信息\n" +
+		"    -C <path>   指定工作路径\n" +
+		"    ... (列出所有选项)\n\n" +
+		"常用示例:\n" +
+		"  git status            # 查看仓库状态\n" +
+		"  git commit -m 'msg'   # 提交更改"
 }
 
 func (c *Client) buildUserPrompt(osname, usedCmd, helpOut, verOut, subQuery, cmdPath string, isMissing, useConcise bool) string {
@@ -347,10 +363,16 @@ func (c *Client) buildUserPrompt(osname, usedCmd, helpOut, verOut, subQuery, cmd
 		return fmt.Sprintf("我的系统环境是%s\n我想要查询的命令是: %s (该命令在本地未安装)", osname, usedCmd)
 	}
 
-	content := fmt.Sprintf("我的系统环境是%s\n命令安装位置: %s\n这是执行的帮助指令及输出的文档%s\n%s", osname, cmdPath, usedCmd, helpOut)
+	mainCmd := usedCmd // 默认为使用的帮助指令
+	if strings.Contains(usedCmd, " ") {
+		mainCmd = strings.Split(usedCmd, " ")[0]
+	}
+
+	content := fmt.Sprintf("我的系统环境是%s\n主命令: %s\n安装位置: %s\n执行的帮助指令: %s\n\n帮助文档内容:\n%s", osname, mainCmd, cmdPath, usedCmd, helpOut)
+	
 	if subQuery != "" {
 		content += fmt.Sprintf("\n\n**我具体想了解的子命令/参数是**: %s", subQuery)
-	} else if useConcise && verOut != "" {
+	} else if verOut != "" {
 		content += fmt.Sprintf("\n\n这是版本查询输出:\n%s", verOut)
 	}
 	return content

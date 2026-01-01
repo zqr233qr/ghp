@@ -81,19 +81,19 @@ $ ghp git
   git push origin main  # 将本地 main 分支推送到远程
 ```
 
-### 2. 查询小众/特定工具
-支持任意安装在系统中的工具，例如 `trans` (Translate Shell)。
+### 2. 子命令查询
+查询 `git` 的 `commit` 子命令用法，现在也会显示主命令信息。
 
 ```bash
-$ ghp trans
+$ ghp git commit
 
-介绍: 用于翻译文本的命令行工具，支持多种语言和功能。
-位置: /usr/local/bin/trans
-版本: 0.9.7.1
+子命令: commit
+作用: 记录变更到仓库
 
-常用示例:
-  trans en:zh "Hello world"    # 将英文“Hello world”翻译成中文
-  trans -b -s en -t zh "Yes"   # 简要模式将英文“Yes”翻译成中文
+常用用法:
+  git commit -m "添加新功能"  # 提交暂存区的修改，并添加简短描述
+  git commit -am "更新文档"  # 自动将所有已跟踪文件的修改添加到暂存区并提交，同时添加描述
+  git commit --amend -m "修正之前提交的描述"  # 修改上一次提交的描述
 ```
 
 ### 3. 命令解析模式 (-a / --analyze)
@@ -149,6 +149,27 @@ $ ghp -f rust
   cargo new my_project --bin     # 创建一个新的Rust二进制项目
   cargo build                    # 编译项目
   cargo run                      # 编译并运行项目
+```
+
+### 6. 完整模式 (-c=false / --concise=false)
+需要查看 AI 翻译的完整帮助文档，格式现在也更清晰了。
+
+```bash
+$ ghp -c=false ssh-copy-id
+
+介绍: 将本地 SSH 公钥复制到远程主机，以实现无密码登录
+位置: /usr/bin/ssh-copy-id
+
+帮助原文:
+  用法: /usr/bin/ssh-copy-id [-h|-?|-f|-n|-s|-x] [-i [identity_file]] ...
+  选项:
+    -f: 强制模式 -- 不检查密钥是否已安装，直接复制密钥
+    -n: 试运行模式 -- 不实际复制密钥
+    ...
+
+常用示例:
+  ssh-copy-id user@example.com      # 将本地公钥复制到 example.com 主机的 user 用户
+  ssh-copy-id -i ~/.ssh/id_rsa.pub user@example.com  # 指定公钥文件并复制...
 ```
 
 ## ⚙️ 参数说明
