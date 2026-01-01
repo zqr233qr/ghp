@@ -20,11 +20,15 @@ builds:
 
 archives:
   - format: tar.gz
+    # 对 Windows 使用 zip 格式
     format_overrides:
       - goos: windows
         format: zip
     name_template: >-
       {{ .ProjectName }}_{{ .Os }}_{{ .Arch }}
+    # 显式设置文件列表为空，只保留编译生成的二进制文件
+    files:
+      - none*
 
 checksum:
   name_template: 'checksums.txt'
